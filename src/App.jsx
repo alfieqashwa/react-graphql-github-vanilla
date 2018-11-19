@@ -9,10 +9,19 @@ const axiosGitHubGraphQL = axios.create({
   baseURL: 'https://api.github.com/graphql',
   headers : {
     Authorization: `bearer ${
-      process.env.REACT_APP_GITHUB_PERSONAL_ACCESS_TOKEN // TOKEN is hidden on .env
+      process.env.REACT_APP_GITHUB_PERSONAL_ACCESS_TOKEN // TOKEN is hidden in .env
     }`,
   },
 });
+
+const GET_ORGANIZATION = `
+  {
+    organization(login: "the-road-to-learn-react") {
+    name
+    url
+    }
+  }
+`;
 
 class App extends Component {
   state = {
@@ -20,7 +29,7 @@ class App extends Component {
   };
 
   componentDidMount() {
-    // fetch data
+    this.onFetchFromGitHub();
   }
 
   onChange = (e) => {
@@ -29,7 +38,14 @@ class App extends Component {
 
   onSubmit = (e) => {
     // fetch data
+
     e.preventDefault();
+  };
+
+  onFetchFromGitHub = () => {
+    axiosGitHubGraphQL
+      .post('', { query: GET_ORGANIZATION })
+      .then(result => console.log(result));
   };
 
   render() {
