@@ -14,42 +14,77 @@ const axiosGitHubGraphQL = axios.create({
   },
 });
 
-const GET_ORGANIZATION = `
+
+const GET_ISSUES_OF_REPOSITORY_QUERY = `
   {
-    organization(login: "the-road-to-learn-react") {
-    name
-    url
+    query ($organization: String!, $repository: String!) {
+      organization(login: "$organization") {
+        name
+        url
+        repository(name: "$repository") {
+          name
+          url
+          issues(last: 5) {
+            edges {
+              nodes {
+                id
+                title
+                url
+              }
+            }
+          }
+        }
+      }
     }
   }
 `;
 
+const getIssuesOfRepository = path => {
+  const [organization, repository] = path.split('/');
+
+  return axiosGitHubGraphQL.post('', {
+    query: GET_ISSUES_OF_REPOSITORY_QUERY,
+    variables: { organization, repository },
+  });
+};
+
+// HOC
+const resolveIssuesQuery = queryResult => () => ({
+  organization: queryResult.data.data.organization,
+  errors: queryResult.data.errors,
+});
+
+// Stateful Class Component
 class App extends Component {
   state = {
     path: 'the-road-to-learn-react/the-road-to-learn-react',
+    organization: null,
+    errors: null,
   };
 
   componentDidMount() {
-    this.onFetchFromGitHub();
+    this.onFetchFromGitHub(this.state.path);
   }
 
-  onChange = (e) => {
+  onChange = e => {
     this.setState({ path: e.target.value });
   }
 
-  onSubmit = (e) => {
-    // fetch data
+  onSubmit = e => {
+    this.onFetchFromGitHub(this.state.path);
 
     e.preventDefault();
   };
 
-  onFetchFromGitHub = () => {
-    axiosGitHubGraphQL
-      .post('', { query: GET_ORGANIZATION })
-      .then(result => console.log(result));
+  onFetchFromGitHub = path => {
+    getIssuesOfRepository(path).then(queryResult =>
+        this.setState(resolveIssuesQuery(queryResult)),
+      );
   };
 
   render() {
-    const { path } = this.state;    // destructuring
+    const { path, organization, errors } = this.state;    // destructuring
+
     return (
       <div className="App">
         <h1>{TITLE}</h1>
@@ -69,10 +104,53 @@ class App extends Component {
         </form>
         <hr />
 
-        {/*...result!*/}
+        {organization
+        ? <Organization organization={organization} errors={errors} />
+        : <p>No infromation yet ...</p>
+        }
       </div>
     );
   }
 }
+
+// Stateless Component
+const Organization = ({ organization, errors }) => {
+  if (errors) {
+    return (
+      <p>
+        <strong>Something went wrong:</strong>
+        {errors.map(error => error.message).join(' ')}
+      </p>
+    );
+  }
+
+  return (
+    <div>
+      <p>
+        <strong>Issues from Organization:</strong>
+        <a href={organization.url}>{organization.name}</a>
+      </p>
+      <Repository repository={organization.repository} />
+    </div>
+  );
+};
+
+const Repository = ({ repository }) => (
+  <div>
+    <p>
+      <strong>In Repository:</strong>
+      <a href={repository.url}>{repository.name}</a>
+    </p>
+
+    <ul>
+      {repository.issues.edges.map(issue => (
+        <li key={issue.node.id}>
+          <a href={issue.node.url}>{issue.node.title}</a>
+        </li>
+      ))}
+    </ul>
+  </div>
+);
+
 
 export default App;
