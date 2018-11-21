@@ -7,23 +7,26 @@ const TITLE = 'React GraphQL GitHub Client';
 
 const axiosGitHubGraphQL = axios.create({
   baseURL: 'https://api.github.com/graphql',
-  headers : {
+  headers: {
     Authorization: `bearer ${
       process.env.REACT_APP_GITHUB_PERSONAL_ACCESS_TOKEN // TOKEN is hidden in .env
-    }`,
-  },
+    }`
+  }
 });
 
-
 const GET_ISSUES_OF_REPOSITORY = `
-    query ($organization: String!, $repository: String!) {
+    query (
+      $organization: String!,
+      $repository: String!,
+      $cursor: String
+    ) {
       organization(login: $organization) {
         name
         url
         repository(name: $repository) {
           name
           url
-          issues(last: 5, states: [OPEN]) {
+          issues(first: 5, after: $cursor, states: [OPEN]) {
             edges {
               node {
                 id
@@ -39,33 +42,62 @@ const GET_ISSUES_OF_REPOSITORY = `
                 }
               }
             }
+            totalCount
+            pageInfo {
+              endCursor
+              hasNextPage
+            }
           }
         }
       }
     }
 `;
 
-const getIssuesOfRepository = path => {
+const getIssuesOfRepository = (path, cursor) => {
   const [organization, repository] = path.split('/');
 
   return axiosGitHubGraphQL.post('', {
     query: GET_ISSUES_OF_REPOSITORY,
-    variables: { organization, repository },
+    variables: { organization, repository, cursor }
   });
 };
 
 // HOC
-const resolveIssuesQuery = queryResult => () => ({
-  organization: queryResult.data.data.organization,
-  errors: queryResult.data.errors,
-});
+const resolveIssuesQuery = (queryResult, cursor) => state => {
+  const { data, errors } = queryResult.data;
+
+  if (!cursor) {
+    return {
+      organization: data.organization,
+      errors // OR errors: errors,
+    };
+  }
+
+  const { edges: oldIssues } = state.organization.repository.issues;
+  const { edges: newIssues } = data.organization.repository.issues;
+  const updatedIssues = [...oldIssues, ...newIssues];
+
+  return {
+    organization: {
+      ...data.organization,
+      repository: {
+        ...data.organization.repository,
+        issues: {
+          ...data.organization.repository.issues,
+          edges: updatedIssues
+        }
+      }
+    },
+    errors
+  };
+};
 
 // Stateful Class Component
 class App extends Component {
   state = {
     path: 'the-road-to-learn-react/the-road-to-learn-react',
     organization: null,
-    errors: null,
+    errors: null
   };
 
   componentDidMount() {
@@ -74,7 +106,7 @@ class App extends Component {
 
   onChange = e => {
     this.setState({ path: e.target.value });
-  }
+  };
 
   onSubmit = e => {
     this.onFetchFromGitHub(this.state.path);
@@ -82,27 +114,27 @@ class App extends Component {
     e.preventDefault();
   };
 
-  onFetchFromGitHub = path => {
-    getIssuesOfRepository(path).then(queryResult =>
-        this.setState(resolveIssuesQuery(queryResult)),
-      );
+  onFetchFromGitHub = (path, cursor) => {
+    getIssuesOfRepository(path, cursor).then(queryResult =>
+      this.setState(resolveIssuesQuery(queryResult, cursor))
+    );
   };
 
-  onFetchMoreIssues = () {
-    ...
-  }
+  onFetchMoreIssues = () => {
+    const { endCursor } = this.state.organization.repository.issues.pageInfo;
+
+    this.onFetchFromGitHub(this.state.path, endCursor);
+  };
 
   render() {
-    const { path, organization, errors } = this.state;    // destructuring
+    const { path, organization, errors } = this.state; // destructuring
 
     return (
       <div className="App">
         <h1>{TITLE}</h1>
 
         <form onSubmit={this.onSubmit}>
-          <label htmlFor="url">
-            Show open issues for https://github.com/
-          </label>
+          <label htmlFor="url">Show open issues for https://github.com/</label>
           <input
             id="url"
             type="text"
@@ -112,12 +144,18 @@ class App extends Component {
           />
           <button type="submit">Search</button>
         </form>
+
         <hr />
 
-        {organization
-        ? <Organization organization={organization} errors={errors} onFetchMoreIssues={this.onFetchMoreIssues} />
-        : <p>No information yet ...</p>
-        }
+        {organization ? (
+          <Organization
+            organization={organization}
+            errors={errors}
+            onFetchMoreIssues={this.onFetchMoreIssues}
+          />
+        ) : (
+          <p>No information yet ...</p>
+        )}
       </div>
     );
   }
@@ -171,9 +209,11 @@ const Repository = ({ repository, onFetchMoreIssues }) => (
     </ul>
 
     <hr />
-    <button onClick={onFetchMoreIssues}>More</button>
+
+    {repository.issues.pageInfo.hasNextPage && (
+      <button onClick={onFetchMoreIssues}>More</button>
+    )}
   </div>
 );
-
 
 export default App;
