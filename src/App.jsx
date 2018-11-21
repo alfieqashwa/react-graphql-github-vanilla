@@ -23,12 +23,20 @@ const GET_ISSUES_OF_REPOSITORY = `
         repository(name: $repository) {
           name
           url
-          issues(last: 5) {
+          issues(last: 5, states: [OPEN]) {
             edges {
               node {
                 id
                 title
                 url
+                reactions(last: 3) {
+                  edges {
+                    node {
+                      id
+                      content
+                    }
+                  }
+                }
               }
             }
           }
@@ -80,6 +88,10 @@ class App extends Component {
       );
   };
 
+  onFetchMoreIssues = () {
+    ...
+  }
+
   render() {
     const { path, organization, errors } = this.state;    // destructuring
 
@@ -103,7 +115,7 @@ class App extends Component {
         <hr />
 
         {organization
-        ? <Organization organization={organization} errors={errors} />
+        ? <Organization organization={organization} errors={errors} onFetchMoreIssues={this.onFetchMoreIssues} />
         : <p>No information yet ...</p>
         }
       </div>
@@ -112,7 +124,7 @@ class App extends Component {
 }
 
 // Stateless Component
-const Organization = ({ organization, errors }) => {
+const Organization = ({ organization, errors, onFetchMoreIssues }) => {
   if (errors) {
     return (
       <p>
@@ -128,12 +140,16 @@ const Organization = ({ organization, errors }) => {
         <strong>Issues from Organization:</strong>
         <a href={organization.url}>{organization.name}</a>
       </p>
-      <Repository repository={organization.repository} />
+      <Repository
+        repository={organization.repository}
+        onFetchMoreIssues={onFetchMoreIssues}
+      />
     </div>
   );
 };
 
-const Repository = ({ repository }) => (
+// Stateless Component
+const Repository = ({ repository, onFetchMoreIssues }) => (
   <div>
     <p>
       <strong>In Repository:</strong>
@@ -144,9 +160,18 @@ const Repository = ({ repository }) => (
       {repository.issues.edges.map(issue => (
         <li key={issue.node.id}>
           <a href={issue.node.url}>{issue.node.title}</a>
+
+          <ul>
+            {issue.node.reactions.edges.map(reaction => (
+              <li key={reaction.node.id}>{reaction.node.content}</li>
+            ))}
+          </ul>
         </li>
       ))}
     </ul>
+
+    <hr />
+    <button onClick={onFetchMoreIssues}>More</button>
   </div>
 );
 
