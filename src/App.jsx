@@ -27,6 +27,9 @@ const GET_ISSUES_OF_REPOSITORY = `
           id
           name
           url
+          stargazers {
+            totalCount
+          }
           viewerHasStarred
           issues(first: 5, after: $cursor, states: [OPEN]) {
             edges {
@@ -50,6 +53,16 @@ const GET_ISSUES_OF_REPOSITORY = `
               hasNextPage
             }
           }
+        }
+      }
+    }
+`;
+
+const ADD_STAR = `
+    mutation ($repositoryId: ID!) {
+      addStar(input: {starrableId:$repositoryId}) {
+        starrable {
+          viewerHasStarred
         }
       }
     }
@@ -94,6 +107,33 @@ const resolveIssuesQuery = (queryResult, cursor) => state => {
   };
 };
 
+const addStarToRepository = repositoryId => {
+  return axiosGitHubGraphQL.post('', {
+    query: ADD_STAR,
+    variables: { repositoryId }
+  });
+};
+
+const resolveAddStarMutation = mutationResult => state => {
+  const { viewerHasStarred } = mutationResult.data.data.addStar.starrable;
+
+  const { totalCount } = state.organization.repository.stargazers;
+
+  return {
+    ...state,
+    organization: {
+      ...state.organization,
+      repository: {
+        ...state.organization.repository,
+        viewerHasStarred,
+        stargazers: {
+          totalCount: totalCount + 1
+        }
+      }
+    }
+  };
+};
+
 // Stateful Class Component
 class App extends Component {
   state = {
@@ -128,6 +168,12 @@ class App extends Component {
     this.onFetchFromGitHub(this.state.path, endCursor);
   };
 
+  onStarRepository = (repositoryId, viewerHasStarred) => {
+    addStarToRepository(repositoryId).then(mutationResult =>
+      this.setState(resolveAddStarMutation(mutationResult))
+    );
+  };
+
   render() {
     const { path, organization, errors } = this.state; // destructuring
 
@@ -154,6 +200,7 @@ class App extends Component {
             organization={organization}
             errors={errors}
             onFetchMoreIssues={this.onFetchMoreIssues}
+            onStarRepository={this.onStarRepository}
           />
         ) : (
           <p>No information yet ...</p>
@@ -164,7 +211,12 @@ class App extends Component {
 }
 
 // Stateless Component
-const Organization = ({ organization, errors, onFetchMoreIssues }) => {
+const Organization = ({
+  organization,
+  errors,
+  onFetchMoreIssues,
+  onStarRepository
+}) => {
   if (errors) {
     return (
       <p>
@@ -183,18 +235,29 @@ const Organization = ({ organization, errors, onFetchMoreIssues }) => {
       <Repository
         repository={organization.repository}
         onFetchMoreIssues={onFetchMoreIssues}
+        onStarRepository={onStarRepository}
       />
     </div>
   );
 };
 
 // Stateless Component
-const Repository = ({ repository, onFetchMoreIssues }) => (
+const Repository = ({ repository, onFetchMoreIssues, onStarRepository }) => (
   <div>
     <p>
       <strong>In Repository:</strong>
       <a href={repository.url}>{repository.name}</a>
     </p>
+
+    <button
+      type="button"
+      onClick={() =>
+        onStarRepository(repository.id, repository.viewerHasStarred)
+      }
+    >
+      {repository.stargazers.totalCount}
+      {repository.viewerHasStarred ? 'Unstar' : 'Star'}
+    </button>
 
     <ul>
       {repository.issues.edges.map(issue => (
