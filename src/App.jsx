@@ -16,17 +16,16 @@ const axiosGitHubGraphQL = axios.create({
 
 
 const GET_ISSUES_OF_REPOSITORY_QUERY = `
-  {
     query ($organization: String!, $repository: String!) {
-      organization(login: "$organization") {
+      organization(login: $organization) {
         name
         url
-        repository(name: "$repository") {
+        repository(name: $repository) {
           name
           url
           issues(last: 5) {
             edges {
-              nodes {
+              node {
                 id
                 title
                 url
@@ -36,7 +35,6 @@ const GET_ISSUES_OF_REPOSITORY_QUERY = `
         }
       }
     }
-  }
 `;
 
 const getIssuesOfRepository = path => {
