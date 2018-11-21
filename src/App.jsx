@@ -15,7 +15,7 @@ const axiosGitHubGraphQL = axios.create({
 });
 
 
-const GET_ISSUES_OF_REPOSITORY_QUERY = `
+const GET_ISSUES_OF_REPOSITORY = `
     query ($organization: String!, $repository: String!) {
       organization(login: $organization) {
         name
@@ -41,7 +41,7 @@ const getIssuesOfRepository = path => {
   const [organization, repository] = path.split('/');
 
   return axiosGitHubGraphQL.post('', {
-    query: GET_ISSUES_OF_REPOSITORY_QUERY,
+    query: GET_ISSUES_OF_REPOSITORY,
     variables: { organization, repository },
   });
 };
@@ -104,7 +104,7 @@ class App extends Component {
 
         {organization
         ? <Organization organization={organization} errors={errors} />
-        : <p>No infromation yet ...</p>
+        : <p>No information yet ...</p>
         }
       </div>
     );
