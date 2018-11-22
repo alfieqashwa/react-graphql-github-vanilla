@@ -323,3 +323,5 @@ const Repository = ({ repository, onFetchMoreIssues, onStarRepository }) => (
 );
 
 export default App;
+
+// React with GraphQL is DONE
